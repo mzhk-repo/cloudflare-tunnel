@@ -1,0 +1,28 @@
+name: App Pipeline
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  deploy-dev:
+    if: github.ref == 'refs/heads/dev'
+    uses: pinokew/shared-workflows/.github/workflows/shared-ci-cd.yml@main
+    with:
+      environment_name: 'development'
+      deploy: ${{ github.event_name == 'push' }}
+      use_ansible: false
+      build_and_push_docker: false
+    secrets: inherit
+
+  deploy-prod:
+    if: github.ref == 'refs/heads/main'
+    uses: pinokew/shared-workflows/.github/workflows/shared-ci-cd.yml@main
+    with:
+      environment_name: 'production'
+      deploy: ${{ github.event_name == 'push' }}
+      use_ansible: false
+      build_and_push_docker: false
+    secrets: inherit
