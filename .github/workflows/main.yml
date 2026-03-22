@@ -2,9 +2,11 @@ name: App Pipeline
 
 on:
   push:
-    branches: [ main, dev ]
+    branches: [ dev, main ]
   pull_request:
-    branches: [ main ]
+    branches: [ dev, main ]
+  release:
+    types: [ published ]
 
 permissions:
   contents: read
@@ -12,19 +14,30 @@ permissions:
   pull-requests: read
 
 jobs:
-  ci-and-deploy:
+  deploy-dev:
+    if: |
+      (github.event_name == 'pull_request' && github.base_ref == 'dev') ||
+      (github.event_name == 'push' && github.ref == 'refs/heads/dev')
     uses: pinokew/shared-workflows/.github/workflows/shared-ci-cd.yml@main
     with:
-      environment_name: ${{ github.ref == 'refs/heads/dev' && 'development' || 'production' }}
+      environment_name: development
       deploy: ${{ github.event_name == 'push' && github.ref == 'refs/heads/dev' }}
       use_ansible: false
       build_and_push_docker: false
-    secrets:
-      TS_OAUTH_CLIENT_ID: ${{ secrets.TS_OAUTH_CLIENT_ID }}
-      TS_OAUTH_SECRET: ${{ secrets.TS_OAUTH_SECRET }}
-      SERVER_HOST: ${{ secrets.SERVER_HOST }}
-      SERVER_USER: ${{ secrets.SERVER_USER }}
-      SERVER_SSH_KEY: ${{ secrets.SERVER_SSH_KEY }}
-      SSH_HOST_KEY_PUB: ${{ secrets.SSH_HOST_KEY_PUB }}
-      DEPLOY_PROJECT_DIR: ${{ secrets.DEPLOY_PROJECT_DIR }}
+      docker_image_name: cloudflare-tunnel
+    secrets: inherit
+
+  deploy-prod:
+    if: |
+      (github.event_name == 'pull_request' && github.base_ref == 'main') ||
+      (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
+      (github.event_name == 'release' && startsWith(github.event.release.tag_name, 'v'))
+    uses: pinokew/shared-workflows/.github/workflows/shared-ci-cd.yml@main
+    with:
+      environment_name: production
+      deploy: ${{ github.event_name == 'release' && startsWith(github.event.release.tag_name, 'v') }}
+      use_ansible: false
+      build_and_push_docker: false
+      docker_image_name: cloudflare-tunnel
+    secrets: inherit
 
