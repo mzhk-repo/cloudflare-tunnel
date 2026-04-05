@@ -26,7 +26,7 @@ jobs:
     if: |
       (github.event_name == 'pull_request' && github.base_ref == 'dev') ||
       (github.event_name == 'push' && github.ref == 'refs/heads/dev')
-    uses: LDUBGD/shared-workflows/.github/workflows/shared-ci-cd.yml@main
+    uses: mzhk-repo/shared-workflows/.github/workflows/shared-ci-cd.yml@main
     with:
       environment_name: development
       deploy: ${{ github.event_name == 'push' && github.ref == 'refs/heads/dev' }}
@@ -47,7 +47,7 @@ jobs:
       (github.event_name == 'pull_request' && github.base_ref == 'main') ||
       (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
       (github.event_name == 'release' && startsWith(github.event.release.tag_name, 'v'))
-    uses: LDUBGD/shared-workflows/.github/workflows/shared-ci-cd.yml@main
+    uses: mzhk-repo/shared-workflows/.github/workflows/shared-ci-cd.yml@main
     with:
       environment_name: production
       deploy: ${{ github.event_name == 'release' && startsWith(github.event.release.tag_name, 'v') }}

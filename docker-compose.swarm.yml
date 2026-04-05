@@ -1,0 +1,16 @@
+services:
+  tunnel:
+    environment: []
+    command: tunnel --metrics 0.0.0.0:2000 run --token-file /run/secrets/cloudflare_tunnel_token
+    secrets:
+      - source: cloudflare_tunnel_token
+        target: cloudflare_tunnel_token
+    deploy:
+      replicas: 1
+      placement:
+        constraints:
+          - node.labels.app_zone == manager
+
+secrets:
+  cloudflare_tunnel_token:
+    external: true
