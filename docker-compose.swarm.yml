@@ -7,6 +7,11 @@ services:
         target: cloudflare_tunnel_token
     deploy:
       replicas: 1
+      restart_policy:
+        condition: on-failure
+        delay: 10s
+        max_attempts: 5
+        window: 2m
       placement:
         constraints:
           - node.labels.app_zone == manager
