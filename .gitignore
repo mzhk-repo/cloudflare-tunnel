@@ -8,3 +8,4 @@
 *.swp
 *~
 archive
+docs/DOCKER-SECRETS.md

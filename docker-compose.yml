@@ -5,13 +5,13 @@ services:
   # створює DSpace-stack (або Traefik-stack у майбутньому).
   # ===================================================
   tunnel:
-    image: cloudflare/cloudflared:${CLOUDFLARE_TUNNEL_VERSION:-2026.2.0}
+    image: cloudflare/cloudflared:${CLOUDFLARE_TUNNEL_VERSION}
     container_name: cf-tunnel
     restart: always
     networks:
       - proxy-net
-    environment:
-      - TUNNEL_TOKEN=${TUNNEL_TOKEN}
+    # environment:
+    #   - TUNNEL_TOKEN=${TUNNEL_TOKEN}
     command: tunnel --metrics 0.0.0.0:2000 run
     healthcheck:
       test: ["CMD", "cloudflared", "tunnel", "--metrics", "127.0.0.1:2000", "ready"]

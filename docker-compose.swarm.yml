@@ -1,5 +1,10 @@
 services:
   tunnel:
+    container_name: !reset null
+    restart: !reset null
+    pull_policy: !reset null
+    env_file: !reset
+      - .env.public
     environment: []
     command: tunnel --metrics 0.0.0.0:2000 run --token-file /run/secrets/cloudflare_tunnel_token
     secrets:
