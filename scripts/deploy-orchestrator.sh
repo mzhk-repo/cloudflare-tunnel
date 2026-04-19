@@ -37,6 +37,60 @@ set_default_secret_name() {
   esac
 }
 
+run_ansible_secrets_if_configured() {
+  local infra_repo_path environment inventory_env inventory_path playbook_path
+
+  infra_repo_path="${INFRA_REPO_PATH:-}"
+  environment="${ENVIRONMENT_NAME:-}"
+
+  if [[ -z "${infra_repo_path}" ]]; then
+    log "INFRA_REPO_PATH is not set; skip ansible secrets refresh"
+    return 0
+  fi
+
+  if [[ ! -d "${infra_repo_path}" ]]; then
+    log "ERROR: INFRA_REPO_PATH does not exist: ${infra_repo_path}"
+    exit 1
+  fi
+
+  if ! command -v ansible-playbook >/dev/null 2>&1; then
+    log "ERROR: ansible-playbook not found on host"
+    exit 1
+  fi
+
+  case "${environment}" in
+    development|dev)
+      inventory_env="dev"
+      ;;
+    production|prod)
+      inventory_env="prod"
+      ;;
+    *)
+      log "ERROR: unsupported ENVIRONMENT_NAME=${environment} (expected: development|production)"
+      exit 1
+      ;;
+  esac
+
+  inventory_path="${infra_repo_path}/ansible/inventories/${inventory_env}/hosts.yml"
+  playbook_path="${infra_repo_path}/ansible/playbooks/swarm.yml"
+
+  if [[ ! -f "${inventory_path}" ]]; then
+    log "ERROR: inventory file not found: ${inventory_path}"
+    exit 1
+  fi
+  if [[ ! -f "${playbook_path}" ]]; then
+    log "ERROR: playbook file not found: ${playbook_path}"
+    exit 1
+  fi
+
+  log "Refreshing Swarm secrets via Ansible (inventory=${inventory_env})"
+  ANSIBLE_CONFIG="${infra_repo_path}/ansible/ansible.cfg" \
+    ansible-playbook \
+    -i "${inventory_path}" \
+    "${playbook_path}" \
+    --tags secrets
+}
+
 deploy_swarm() {
   local compose_file swarm_file raw_manifest deploy_manifest
 
@@ -69,6 +123,8 @@ deploy_swarm() {
     log "ERROR: CF_TUNNEL_TOKEN_SECRET_NAME is not set"
     exit 1
   fi
+
+  run_ansible_secrets_if_configured
 
   log "Rendering Swarm manifest (stack=${STACK_NAME}, env_file=${ENV_FILE})"
   docker compose --env-file "${ENV_FILE}" \
