@@ -1,0 +1,101 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+
+MODE="${ORCHESTRATOR_MODE:-noop}"
+STACK_NAME="${STACK_NAME:-cf_tunnel}"
+ENV_FILE="${ORCHESTRATOR_ENV_FILE:-/tmp/env.decrypted}"
+
+log() {
+  printf '[deploy-orchestrator] %s\n' "$*"
+}
+
+detect_compose_file() {
+  if [[ -f "docker-compose.yaml" ]]; then
+    echo "docker-compose.yaml"
+  elif [[ -f "docker-compose.yml" ]]; then
+    echo "docker-compose.yml"
+  else
+    echo ""
+  fi
+}
+
+set_default_secret_name() {
+  if [[ -n "${CF_TUNNEL_TOKEN_SECRET_NAME:-}" ]]; then
+    return 0
+  fi
+
+  case "${ENVIRONMENT_NAME:-}" in
+    development|dev)
+      export CF_TUNNEL_TOKEN_SECRET_NAME="cf_tunnel_token_dev_v1"
+      ;;
+    production|prod)
+      export CF_TUNNEL_TOKEN_SECRET_NAME="cf_tunnel_token_prod_v1"
+      ;;
+  esac
+}
+
+deploy_swarm() {
+  local compose_file swarm_file raw_manifest deploy_manifest
+
+  compose_file="$(detect_compose_file)"
+  swarm_file="docker-compose.swarm.yml"
+  raw_manifest="/tmp/${STACK_NAME}.stack.raw.yml"
+  deploy_manifest="/tmp/${STACK_NAME}.stack.deploy.yml"
+
+  if [[ -z "${compose_file}" ]]; then
+    log "ERROR: compose file not found (expected docker-compose.yaml|yml)"
+    exit 1
+  fi
+  if [[ ! -f "${swarm_file}" ]]; then
+    log "ERROR: ${swarm_file} not found"
+    exit 1
+  fi
+
+  if [[ ! -f "${ENV_FILE}" ]]; then
+    if [[ -f ".env" ]]; then
+      ENV_FILE=".env"
+      log "Env file ${ORCHESTRATOR_ENV_FILE:-/tmp/env.decrypted} not found; fallback to .env"
+    else
+      log "ERROR: env file not found (${ORCHESTRATOR_ENV_FILE:-/tmp/env.decrypted}) and .env missing"
+      exit 1
+    fi
+  fi
+
+  set_default_secret_name
+  if [[ -z "${CF_TUNNEL_TOKEN_SECRET_NAME:-}" ]]; then
+    log "ERROR: CF_TUNNEL_TOKEN_SECRET_NAME is not set"
+    exit 1
+  fi
+
+  log "Rendering Swarm manifest (stack=${STACK_NAME}, env_file=${ENV_FILE})"
+  docker compose --env-file "${ENV_FILE}" \
+    -f "${compose_file}" \
+    -f "${swarm_file}" \
+    config > "${raw_manifest}"
+
+  awk 'NR==1 && $1=="name:" {next} {print}' "${raw_manifest}" > "${deploy_manifest}"
+
+  log "Deploying stack ${STACK_NAME}"
+  docker stack deploy -c "${deploy_manifest}" "${STACK_NAME}"
+
+  rm -f "${raw_manifest}" "${deploy_manifest}"
+  log "Swarm deploy completed"
+}
+
+cd "${PROJECT_ROOT}"
+
+case "${MODE}" in
+  noop)
+    log "No-op mode. Set ORCHESTRATOR_MODE=swarm to enable Phase 8 Swarm deploy path."
+    ;;
+  swarm)
+    deploy_swarm
+    ;;
+  *)
+    log "ERROR: unknown ORCHESTRATOR_MODE=${MODE}. Supported: noop, swarm"
+    exit 1
+    ;;
+esac

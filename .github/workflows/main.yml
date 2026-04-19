@@ -30,9 +30,11 @@ jobs:
     with:
       environment_name: development
       deploy: ${{ github.event_name == 'push' && github.ref == 'refs/heads/dev' }}
-      use_ansible: false
+      use_ansible: true
       build_and_push_docker: false
       docker_image_name: cloudflare-tunnel
+      orchestration_script_path: 'scripts/deploy-orchestrator.sh'
+      infra_repo_path: '/opt/Ansible'
     secrets:
       TS_OAUTH_CLIENT_ID: ${{ secrets.TS_OAUTH_CLIENT_ID }}
       TS_OAUTH_SECRET: ${{ secrets.TS_OAUTH_SECRET }}
@@ -41,6 +43,7 @@ jobs:
       SERVER_SSH_KEY: ${{ secrets.SERVER_SSH_KEY }}
       SSH_HOST_KEY_PUB: ${{ secrets.SSH_HOST_KEY_PUB }}
       DEPLOY_PROJECT_DIR: ${{ secrets.DEPLOY_PROJECT_DIR }}
+      SOPS_AGE_KEY: ${{ secrets.SOPS_AGE_KEY }}
 
   deploy-prod:
     if: |
@@ -51,9 +54,11 @@ jobs:
     with:
       environment_name: production
       deploy: ${{ github.event_name == 'release' && startsWith(github.event.release.tag_name, 'v') }}
-      use_ansible: false
+      use_ansible: true
       build_and_push_docker: false
       docker_image_name: cloudflare-tunnel
+      orchestration_script_path: 'scripts/deploy-orchestrator.sh'
+      infra_repo_path: '/opt/Ansible'
     secrets:
       TS_OAUTH_CLIENT_ID: ${{ secrets.TS_OAUTH_CLIENT_ID }}
       TS_OAUTH_SECRET: ${{ secrets.TS_OAUTH_SECRET }}
@@ -62,4 +67,4 @@ jobs:
       SERVER_SSH_KEY: ${{ secrets.SERVER_SSH_KEY }}
       SSH_HOST_KEY_PUB: ${{ secrets.SSH_HOST_KEY_PUB }}
       DEPLOY_PROJECT_DIR: ${{ secrets.DEPLOY_PROJECT_DIR }}
-
+      SOPS_AGE_KEY: ${{ secrets.SOPS_AGE_KEY }}
