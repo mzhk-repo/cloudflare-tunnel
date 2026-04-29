@@ -149,7 +149,7 @@ deploy_swarm() {
   swarm_file="docker-compose.swarm.yml"
   raw_manifest="$(mktemp "${PROJECT_ROOT}/.${STACK_NAME}.stack.raw.XXXXXX.yml")"
   deploy_manifest="$(mktemp "${PROJECT_ROOT}/.${STACK_NAME}.stack.deploy.XXXXXX.yml")"
-  trap 'rm -f "${raw_manifest:-}" "${deploy_manifest:-}"' RETURN
+  trap "rm -f '${raw_manifest}' '${deploy_manifest}'" RETURN EXIT
 
   if [[ -z "${compose_file}" ]]; then
     log "ERROR: compose file not found (expected docker-compose.yaml|yml)"

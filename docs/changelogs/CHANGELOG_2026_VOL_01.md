@@ -31,3 +31,11 @@
 - **Verification:** Пройдено `bash -n scripts/deploy-orchestrator-swarm.sh`, `bash -n scripts/ensure-swarm-network.sh`, mock success path, missing ansible у `auto`, missing ansible у `required` та missing Docker Secret.
 - **Risks:** Якщо secret не створений заздалегідь, deploy тепер впаде пізніше з явною помилкою про відсутній Docker Secret.
 - **Rollback:** Повернути hard-fail поведінку в `run_ansible_secrets_if_configured` і прибрати `ensure_swarm_secret_exists`.
+
+## [2026-04-28] — Cleanup Swarm manifest artifacts on failure
+
+- **Context:** Після невдалих запусків могли залишатися тимчасові manifest-файли `.cf_tunnel.stack.*.yml`.
+- **Change:** Cleanup trap у `scripts/deploy-orchestrator-swarm.sh` переведено на `RETURN EXIT` із зафіксованими шляхами до raw/deploy manifest, щоб артефакти видалялися навіть при `exit 1`.
+- **Verification:** Пройдено `bash -n scripts/deploy-orchestrator-swarm.sh` і mock failure-сценарій з відсутнім Docker Secret; після падіння `.cf_tunnel.stack.*.yml` не залишились.
+- **Risks:** Низькі; cleanup видаляє тільки два конкретні tmp-файли, створені поточним запуском.
+- **Rollback:** Повернути trap до `RETURN`, якщо потрібно зберігати tmp manifest для debugging.
