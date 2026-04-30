@@ -12,10 +12,9 @@ services:
     deploy:
       replicas: 1
       restart_policy:
-        condition: on-failure
-        delay: 10s
-        max_attempts: 5
-        window: 2m
+        condition: any
+        delay: 30s
+        window: 5m
       placement:
         constraints:
           - node.labels.app_zone == manager

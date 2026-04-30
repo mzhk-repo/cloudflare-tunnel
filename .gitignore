@@ -18,3 +18,5 @@ archive
 
 # Legacy docs path
 /docs/DOCKER-SECRETS.md
+docs/AGENTS.md
+docs/hello-world.md

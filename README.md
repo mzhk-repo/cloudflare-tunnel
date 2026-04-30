@@ -47,6 +47,10 @@ docker compose -f docker-compose.yml -f docker-compose.swarm.yml config \
 | docker stack deploy -c - cf_tunnel
 ```
 
+Для Swarm у `docker-compose.swarm.yml` використовується `restart_policy.condition: any`
+без `max_attempts`. Це потрібно, щоб тунель автоматично піднімався після мережевих
+інцидентів, навіть якщо `cloudflared` завершується з кодом `0` після SIGTERM.
+
 ## Змінні
 
 | Змінна | Дефолт | Опис |
