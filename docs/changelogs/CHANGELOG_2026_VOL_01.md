@@ -39,3 +39,11 @@
 - **Verification:** Пройдено `bash -n scripts/deploy-orchestrator-swarm.sh` і mock failure-сценарій з відсутнім Docker Secret; після падіння `.cf_tunnel.stack.*.yml` не залишились.
 - **Risks:** Низькі; cleanup видаляє тільки два конкретні tmp-файли, створені поточним запуском.
 - **Rollback:** Повернути trap до `RETURN`, якщо потрібно зберігати tmp manifest для debugging.
+
+## [2026-05-07] — Versioned Docker Secret для Cloudflare Tunnel token
+
+- **Context:** Swarm deploy використовував external `CF_TUNNEL_TOKEN_SECRET_NAME`, але назва secret могла залишатися статичною і не відображати зміну `TUNNEL_TOKEN`.
+- **Change:** Додано `scripts/render-versioned-env-secret.sh`, який читає runtime env без `source`, створює immutable Docker Secret для `TUNNEL_TOKEN` з hash-based назвою та записує її в `CF_TUNNEL_TOKEN_SECRET_NAME`. `scripts/deploy-orchestrator-swarm.sh` тепер викликає цей helper перед перевіркою Docker Secret і рендерингом manifest.
+- **Verification:** Пройдено `bash -n scripts/render-versioned-env-secret.sh`, `bash -n scripts/deploy-orchestrator-swarm.sh`, `shellcheck` для обох скриптів, mock-перевірку створення/повторного використання secret, перевірку зміни hash при зміні `TUNNEL_TOKEN` і mock Swarm deploy без реального production deploy.
+- **Risks:** Deploy тепер очікує наявний `TUNNEL_TOKEN` у runtime env-файлі, щоб самостійно рендерити актуальний Docker Secret.
+- **Rollback:** Прибрати виклик `render_versioned_env_secrets` із `scripts/deploy-orchestrator-swarm.sh` і повернути використання заздалегідь створеного external `CF_TUNNEL_TOKEN_SECRET_NAME`.

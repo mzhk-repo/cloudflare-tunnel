@@ -5,7 +5,7 @@
 - CI/CD decrypt flow: shared workflow розшифровує `env.dev.enc` або `env.prod.enc` у тимчасовий dotenv-файл і передає шлях через `ORCHESTRATOR_ENV_FILE`.
 - Swarm deploy flow: `scripts/deploy-orchestrator-swarm.sh` запускається з `ORCHESTRATOR_MODE=swarm`, перевіряє env-файл, визначає Docker Secret для Cloudflare Tunnel token і деплоїть stack `cf_tunnel`.
 - Network flow: `scripts/ensure-swarm-network.sh` перевіряє або створює external Swarm network для Traefik/proxy-шару. За замовчуванням це `proxy-net`.
-- Secret flow: значення Cloudflare tunnel token не передається у manifest як plaintext. У Swarm використовується external Docker Secret `cf_tunnel_token_dev_v1` або `cf_tunnel_token_prod_v1`.
+- Secret flow: значення Cloudflare tunnel token не передається у manifest як plaintext. `scripts/render-versioned-env-secret.sh` створює immutable Docker Secret із hash-based назвою та записує її в `CF_TUNNEL_TOKEN_SECRET_NAME`.
 - Ansible refresh flow: `ANSIBLE_SECRETS_REFRESH=auto` є дефолтом. Якщо `INFRA_REPO_PATH` заданий, але `ansible-playbook` недоступний, refresh пропускається з warning; далі deploy продовжується тільки якщо Docker Secret уже існує.
 - Локальний fallback на `.env` дозволений тільки для dev-перевірок, коли `ORCHESTRATOR_ENV_FILE` не передано.
 
@@ -14,6 +14,7 @@
 | Скрипт | Категорія | Статус |
 |---|---|---|
 | `scripts/deploy-orchestrator-swarm.sh` | 1б / orchestrator | Основний Swarm deploy entrypoint для CI/CD |
+| `scripts/render-versioned-env-secret.sh` | 1б / deploy-adjacent | Рендерить Docker Secret для `TUNNEL_TOKEN` із hash-based назвою |
 | `scripts/ensure-swarm-network.sh` | 1б / deploy-adjacent | Pre-deploy перевірка external Swarm network |
 | `scripts/validate_sops_encrypted.py` | out-of-scope | SOPS validation helper, не змінювати |
 | `scripts/entrypoint.sh` | out-of-scope | Docker ENTRYPOINT контейнера, не змінювати |
@@ -28,8 +29,9 @@
 - У режимі `noop` нічого не деплоїть і лише друкує підказку.
 - У режимі `swarm` перевіряє наявність `docker-compose.yml` і `docker-compose.swarm.yml`.
 - Читає env через `ORCHESTRATOR_ENV_FILE`; якщо файл відсутній, допускає fallback на локальний `.env` тільки для dev.
-- Встановлює дефолтну назву Docker Secret за `ENVIRONMENT_NAME`: `cf_tunnel_token_dev_v1` для dev або `cf_tunnel_token_prod_v1` для prod.
+- Встановлює дефолтну назву Docker Secret за `ENVIRONMENT_NAME` тільки як fallback до versioned render flow.
 - Якщо задано `INFRA_REPO_PATH`, у режимі `ANSIBLE_SECRETS_REFRESH=auto` пробує запустити Ansible playbook `ansible/playbooks/swarm.yml` з тегом `secrets`. Якщо Ansible недоступний, refresh пропускається з warning.
+- Викликає `scripts/render-versioned-env-secret.sh`, який створює або перевикористовує Docker Secret для `TUNNEL_TOKEN`, оновлює `CF_TUNNEL_TOKEN_SECRET_NAME` у runtime env-файлі та експортує це ім'я для подальших перевірок.
 - Перед deploy перевіряє, що external Docker Secret `CF_TUNNEL_TOKEN_SECRET_NAME` існує у Swarm.
 - Викликає `scripts/ensure-swarm-network.sh` перед рендерингом manifest.
 - Рендерить merged manifest через `docker compose --env-file ... config`, прибирає верхній `name:` і виконує `docker stack deploy -c <manifest> <STACK_NAME>`.
@@ -144,6 +146,34 @@ ANSIBLE_SECRETS_REFRESH=skip bash scripts/deploy-orchestrator-swarm.sh
 
 ```text
 [deploy-orchestrator] ERROR: required Docker Secret not found: cf_tunnel_token_dev_v1
+```
+
+### `scripts/render-versioned-env-secret.sh`
+
+#### Бізнес-логіка
+
+- Deploy-adjacent helper для `scripts/deploy-orchestrator-swarm.sh`.
+- Читає env через `--env-file`, `ORCHESTRATOR_ENV_FILE` або локальний `.env` fallback тільки для dev.
+- Не виконує env-файл через `source`; підтримує прості dotenv-рядки `KEY=value` та `export KEY=value`.
+- Рендерить `TUNNEL_TOKEN` у Docker Secret з назвою `<base>_<sha256-12>`.
+- Base name задається через `CF_TUNNEL_TOKEN_SECRET_BASE`; якщо не задано, для `ENVIRONMENT_NAME=development|dev` використовується `cf_tunnel_token_dev`, для `production|prod` — `cf_tunnel_token_prod`, інакше `cf_tunnel_token`.
+- Через `--write-env-file` замінює або додає `CF_TUNNEL_TOKEN_SECRET_NAME=<rendered-name>` у runtime env-файлі.
+- Повторний запуск із тим самим `TUNNEL_TOKEN` перевикористовує існуючий Docker Secret; зміна токена створює нове hash-based ім'я.
+
+#### Manual execution
+
+```bash
+ORCHESTRATOR_ENV_FILE=/tmp/env.decrypted \
+ENVIRONMENT_NAME=development \
+bash scripts/render-versioned-env-secret.sh \
+  --env-file /tmp/env.decrypted \
+  --write-env-file /tmp/env.decrypted
+```
+
+Очікуваний stdout містить тільки generated dotenv-рядок:
+
+```text
+CF_TUNNEL_TOKEN_SECRET_NAME=cf_tunnel_token_dev_<sha256-12>
 ```
 
 ### `scripts/ensure-swarm-network.sh`

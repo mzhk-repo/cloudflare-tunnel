@@ -8,6 +8,8 @@ MODE="${ORCHESTRATOR_MODE:-noop}"
 STACK_NAME="${STACK_NAME:-cf_tunnel}"
 ENV_FILE="${ORCHESTRATOR_ENV_FILE:-/tmp/env.decrypted}"
 ANSIBLE_SECRETS_REFRESH="${ANSIBLE_SECRETS_REFRESH:-auto}"
+RAW_MANIFEST=""
+DEPLOY_MANIFEST=""
 
 log() {
   printf '[deploy-orchestrator] %s\n' "$*"
@@ -137,19 +139,49 @@ ensure_swarm_secret_exists() {
   log "Docker Secret exists: ${CF_TUNNEL_TOKEN_SECRET_NAME}"
 }
 
+render_versioned_env_secrets() {
+  local rendered_output rendered_line rendered_key rendered_value
+
+  log "Rendering hash-versioned Docker secrets"
+  rendered_output="$("${SCRIPT_DIR}/render-versioned-env-secret.sh" \
+    --env-file "${ENV_FILE}" \
+    --write-env-file "${ENV_FILE}")"
+
+  while IFS= read -r rendered_line || [[ -n "${rendered_line}" ]]; do
+    [[ "${rendered_line}" == *"="* ]] || continue
+    rendered_key="${rendered_line%%=*}"
+    rendered_value="${rendered_line#*=}"
+
+    case "${rendered_key}" in
+      CF_TUNNEL_TOKEN_SECRET_NAME)
+        export CF_TUNNEL_TOKEN_SECRET_NAME="${rendered_value}"
+        ;;
+    esac
+  done <<< "${rendered_output}"
+
+  if [[ -z "${CF_TUNNEL_TOKEN_SECRET_NAME:-}" ]]; then
+    log "ERROR: render-versioned-env-secret.sh did not return CF_TUNNEL_TOKEN_SECRET_NAME"
+    exit 1
+  fi
+}
+
 ensure_external_networks() {
   log "Ensuring required external Swarm networks"
   ORCHESTRATOR_ENV_FILE="${ENV_FILE}" "${SCRIPT_DIR}/ensure-swarm-network.sh"
 }
 
+cleanup_stack_manifests() {
+  rm -f "${RAW_MANIFEST:-}" "${DEPLOY_MANIFEST:-}"
+}
+
 deploy_swarm() {
-  local compose_file swarm_file raw_manifest deploy_manifest
+  local compose_file swarm_file
 
   compose_file="$(detect_compose_file)"
   swarm_file="docker-compose.swarm.yml"
-  raw_manifest="$(mktemp "${PROJECT_ROOT}/.${STACK_NAME}.stack.raw.XXXXXX.yml")"
-  deploy_manifest="$(mktemp "${PROJECT_ROOT}/.${STACK_NAME}.stack.deploy.XXXXXX.yml")"
-  trap "rm -f '${raw_manifest}' '${deploy_manifest}'" RETURN EXIT
+  RAW_MANIFEST="$(mktemp "${PROJECT_ROOT}/.${STACK_NAME}.stack.raw.XXXXXX.yml")"
+  DEPLOY_MANIFEST="$(mktemp "${PROJECT_ROOT}/.${STACK_NAME}.stack.deploy.XXXXXX.yml")"
+  trap cleanup_stack_manifests RETURN EXIT
 
   if [[ -z "${compose_file}" ]]; then
     log "ERROR: compose file not found (expected docker-compose.yaml|yml)"
@@ -171,12 +203,9 @@ deploy_swarm() {
   fi
 
   set_default_secret_name
-  if [[ -z "${CF_TUNNEL_TOKEN_SECRET_NAME:-}" ]]; then
-    log "ERROR: CF_TUNNEL_TOKEN_SECRET_NAME is not set"
-    exit 1
-  fi
 
   run_ansible_secrets_if_configured
+  render_versioned_env_secrets
   ensure_swarm_secret_exists
   ensure_external_networks
 
@@ -184,12 +213,12 @@ deploy_swarm() {
   docker compose --env-file "${ENV_FILE}" \
     -f "${compose_file}" \
     -f "${swarm_file}" \
-    config > "${raw_manifest}"
+    config > "${RAW_MANIFEST}"
 
-  awk 'NR==1 && $1=="name:" {next} {print}' "${raw_manifest}" > "${deploy_manifest}"
+  awk 'NR==1 && $1=="name:" {next} {print}' "${RAW_MANIFEST}" > "${DEPLOY_MANIFEST}"
 
   log "Deploying stack ${STACK_NAME}"
-  docker stack deploy -c "${deploy_manifest}" "${STACK_NAME}"
+  docker stack deploy -c "${DEPLOY_MANIFEST}" "${STACK_NAME}"
 
   log "Swarm deploy completed"
 }

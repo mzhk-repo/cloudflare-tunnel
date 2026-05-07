@@ -205,6 +205,7 @@ fi
 | `check-secrets-hygiene.sh` | 1а | Перевірка без секретів |
 | `verify-env.sh` | 1а | source дозволено тут |
 | `init-volumes.sh` | 1б | Ініціалізація bind-mount директорій |
+| `render-versioned-env-secret.sh` | 1б | Рендерить immutable Docker secrets з hash-based назвами для env payload і external secrets |
 | `bootstrap-live-configs.sh` | 1б | Генерація конфігів |
 | `koha-lockdown-password-prefs.sh` | 1б | Harden налаштувань |
 | `patch/` | 1б | Патч-скрипти |
