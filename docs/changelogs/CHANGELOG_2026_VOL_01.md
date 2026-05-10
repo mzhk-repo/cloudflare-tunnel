@@ -47,3 +47,10 @@
 - **Verification:** Пройдено `bash -n scripts/render-versioned-env-secret.sh`, `bash -n scripts/deploy-orchestrator-swarm.sh`, `shellcheck` для обох скриптів, mock-перевірку створення/повторного використання secret, перевірку зміни hash при зміні `TUNNEL_TOKEN` і mock Swarm deploy без реального production deploy.
 - **Risks:** Deploy тепер очікує наявний `TUNNEL_TOKEN` у runtime env-файлі, щоб самостійно рендерити актуальний Docker Secret.
 - **Rollback:** Прибрати виклик `render_versioned_env_secrets` із `scripts/deploy-orchestrator-swarm.sh` і повернути використання заздалегідь створеного external `CF_TUNNEL_TOKEN_SECRET_NAME`.
+
+## [2026-05-10] — Документація Cloudflare Tunnel target на Traefik service DNS
+
+- **Context:** Traefik більше не публікує HTTP entrypoint на host-порт `8080`; Cloudflare Tunnel і Traefik працюють у спільній Docker-мережі `proxy-net`.
+- **Change:** У `README.md` явно зафіксовано, що token-based tunnel routes налаштовуються у Cloudflare Zero Trust Dashboard, а service target має бути `http://traefik:80` замість `http://127.0.0.1:8080`.
+- **Verification:** Локальні compose-файли не містять ingress URL, бо tunnel запускається через token; runtime-перевірка має підтвердити Docker DNS доступність `traefik` у `proxy-net`.
+- **Rollback:** Повернути попередню документацію, якщо Traefik знову буде публікувати host-порт для tunnel.
