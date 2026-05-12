@@ -58,7 +58,7 @@ jobs:
       use_ansible: true
       build_and_push_docker: false
       docker_image_name: cloudflare-tunnel
-      orchestration_script_path: 'scripts/deploy-orchestrator.sh'
+      orchestration_script_path: 'scripts/deploy-orchestrator-swarm.sh'
       infra_repo_path: '/opt/Ansible'
     secrets:
       TS_OAUTH_CLIENT_ID: ${{ secrets.TS_OAUTH_CLIENT_ID }}

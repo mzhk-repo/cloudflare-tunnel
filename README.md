@@ -11,6 +11,17 @@
 
 Контейнер підключається до зовнішньої мережі `proxy-net`.
 
+Маршрути `Public Hostname` для token-based tunnel налаштовуються в Cloudflare
+Zero Trust Dashboard. Для цього стека service target має бути:
+
+```text
+http://traefik:80
+```
+
+Не використовуй `http://127.0.0.1:8080`: Traefik не публікує HTTP entrypoint
+на host-порт, а cloudflared має звертатися до Traefik через Docker DNS у
+`proxy-net`.
+
 ## SOPS + age (dev)
 
 Для Swarm deploy у dev використовуємо зашифровані файли в корені repo:
